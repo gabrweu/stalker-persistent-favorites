@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+
+    <string id="ui_mcm_menu_persistent_favorites"><text>Sorting Plus - Persistent Favorites</text></string>
+    <string id="ui_mcm_persistent_favorites_title"><text>Sorting Plus - Persistent Favorites</text></string>
+    <string id="ui_mcm_persistent_favorites_help"><text>Keeps your inventory "favorite" (green) and "junk" (red) marks from Sorting Plus across new games. Requires Sorting Plus, duh.</text></string>
+
+    <string id="ui_mcm_persistent_favorites_enable"><text>Enable persistence</text></string>
+    <string id="ui_mcm_persistent_favorites_enable_desc"><text>Master switch. Off = Sorting Plus is left completely untouched (marks stay per-save as normal). Why would you disable this?</text></string>
+
+    <string id="ui_mcm_persistent_favorites_persist_favorites"><text>Persist favorites (green)</text></string>
+    <string id="ui_mcm_persistent_favorites_persist_favorites_desc"><text>Carry the green favorite list across playthroughs.</text></string>
+
+    <string id="ui_mcm_persistent_favorites_persist_junk"><text>Persist junk (red)</text></string>
+    <string id="ui_mcm_persistent_favorites_persist_junk_desc"><text>Carry the red junk list across playthroughs. A section is favorite OR junk, never both.</text></string>
+
+    <string id="ui_mcm_persistent_favorites_reset"><text>Reset saved favorites and junk</text></string>
+    <string id="ui_mcm_persistent_favorites_reset_desc"><text>Permanently delete the persistent file and clear all favorite/junk marks from your current game.</text></string>
+    <string id="ui_mcm_persistent_favorites_reset_confirm"><text>Delete ALL remembered favorites and junk marks? This empties the saved file and clears the marks in your current game. This cannot be undone.</text></string>
+    <string id="ui_mcm_persistent_favorites_reset_done"><text>Persistent favorites and junk reset.</text></string>
+
+    <string id="ui_mcm_persistent_favorites_debug_logging"><text>Debug logging</text></string>
+    <string id="ui_mcm_persistent_favorites_debug_logging_desc"><text>Logs for development and bug reporting.</text></string>
+
+</string_table>

@@ -1,0 +1,28 @@
+local function build_widget(entry)
+    local w = { id = entry.key, def = entry.def }
+    for k, v in pairs(entry.mcm) do w[k] = v end
+    return w
+end
+
+function on_mcm_load()
+    local gr = {
+        {
+            id = "title", type = "slide", link = "persistent_favorites_banner.dds",
+            text = "ui_mcm_persistent_favorites_title", size = { 512, 77 },
+            spacing = 20, borderless = true,
+        },
+        {
+            id = "help", type = "desc", clr = { 200, 200, 255, 200 },
+            text = "ui_mcm_persistent_favorites_help",
+        },
+    }
+
+    for _, entry in ipairs(z_persistent_favorites_config.SETTINGS) do
+        gr[#gr + 1] = build_widget(entry)
+    end
+
+    gr[#gr + 1] = { id = "reset_line", type = "line" }
+    gr[#gr + 1] = { id = "reset", type = "button", functor = { z_persistent_favorites.prompt_reset } }
+
+    return { id = "persistent_favorites", sh = true, gr = gr }
+end

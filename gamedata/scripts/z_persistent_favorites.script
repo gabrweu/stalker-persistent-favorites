@@ -1,0 +1,334 @@
+-- 17 July 2026, by Era.
+
+local SP_PAGE    = "persistent_favorites"     -- our MCM page id
+local STORE_FILE = "persistent_favorites.ltx" -- lives in $game_config$ (appdata)
+local settings_cache = {}  -- a copy: reload_settings_cache mutates this, DEFAULTS must stay pristine
+for k, v in pairs(z_persistent_favorites_config.DEFAULTS) do
+    settings_cache[k] = v
+end
+
+local function mcm_get(key)
+    if ui_mcm then
+        local v = ui_mcm.get(SP_PAGE .. "/" .. key)
+        if v ~= nil then return v end
+    end
+    return z_persistent_favorites_config.DEFAULTS[key]
+end
+
+local function reload_settings_cache()
+    for key, _ in pairs(settings_cache) do
+        settings_cache[key] = mcm_get(key)
+    end
+end
+
+local function dbg(fmt, ...)
+    if not settings_cache.debug_logging then return end
+    local args = {}
+    for i = 1, select("#", ...) do
+        args[i] = tostring((select(i, ...)))
+    end
+    printf("[persistent_favorites] " .. fmt, unpack(args))
+end
+
+local LISTS = {
+    {
+        store   = "favorites",
+        other   = "junk",
+        set     = "set_favorite",
+        is      = "is_favorite",
+        mdata   = "rax_favorite_itms",
+        setting = "persist_favorites",
+    },
+    {
+        store   = "junk",
+        other   = "favorites",
+        set     = "set_junk",
+        is      = "is_junk",
+        mdata   = "rax_junk_itms",
+        setting = "persist_junk",
+    },
+}
+
+local store   -- utils_data.cfg_file instance, or nil until first use
+
+local function get_store()
+    if not store then
+        local path = getFS():update_path("$game_config$", "") .. STORE_FILE
+        store = utils_data.cfg_file(path)
+    end
+    return store
+end
+
+-- Read one INI section as a { [section_name] = true } set.
+local function read_set(store_sec)
+    local set  = {}
+    local keys = get_store():GetKeys(store_sec)
+    if keys then
+        for sec, _ in pairs(keys) do
+            set[sec] = true
+        end
+    end
+    return set
+end
+
+local function store_mark(store_sec, other_sec, sec)
+    local st      = get_store()
+    local changed = false
+    if not st:KeyExist(store_sec, sec) then
+        st:SetValue(store_sec, sec, "true")
+        changed = true
+    end
+    if st:KeyExist(other_sec, sec) then
+        st:ClearValue(other_sec, sec)
+        changed = true
+    end
+    if changed then
+        st:Save()
+        dbg("persisted %s: %s", store_sec, sec)
+    end
+end
+
+local function store_unmark(store_sec, sec)
+    local st = get_store()
+    if st:KeyExist(store_sec, sec) then
+        st:ClearValue(store_sec, sec)
+        st:Save()
+        dbg("dropped %s: %s", store_sec, sec)
+    end
+end
+
+local function is_initialized()
+    return get_store():KeyExist("meta", "initialized")
+end
+
+local function mark_initialized()
+    local st = get_store()
+    st:SetValue("meta", "initialized", "true")
+    st:Save()
+end
+
+
+-- Sorting Plus is required. Obviously.
+local function sp_available()
+    if zzz_rax_sortingplus_mcm == nil then return false end
+    for _, L in ipairs(LISTS) do
+        if type(zzz_rax_sortingplus_mcm[L.set]) ~= "function"
+        or type(zzz_rax_sortingplus_mcm[L.is])  ~= "function" then
+            return false
+        end
+    end
+    return true
+end
+
+local applying = false
+
+function sync_and_apply()
+    if not settings_cache.enable then
+        dbg("disabled via MCM -- not syncing")
+        return
+    end
+
+    if not sp_available() then
+        printf("![persistent_favorites] RAX SortingPlus not found -- persistence inactive")
+        return
+    end
+
+    local st   = get_store()
+    local sets = {}
+
+    for _, L in ipairs(LISTS) do
+        sets[L.store] = read_set(L.store)
+    end
+
+    local ok, mdata = pcall(alife_storage_manager.get_state)
+
+    if not is_initialized() then
+        local changed = false
+        if ok and mdata then
+            for _, L in ipairs(LISTS) do
+                if settings_cache[L.setting] and mdata[L.mdata] then
+                    for sec, _ in pairs(mdata[L.mdata]) do
+                        if not sets[L.store][sec] then
+                            sets[L.store][sec] = true
+                            st:SetValue(L.store, sec, "true")
+                            changed = true
+
+                            if sets[L.other][sec] then
+                                sets[L.other][sec] = nil
+                                st:ClearValue(L.other, sec)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        if changed then st:Save() end
+        mark_initialized()
+
+        applying = true
+        local counts = {}
+        for _, L in ipairs(LISTS) do
+            local n = 0
+            if settings_cache[L.setting] then
+                for sec, _ in pairs(sets[L.store]) do
+                    if not zzz_rax_sortingplus_mcm[L.is](sec) then
+                        zzz_rax_sortingplus_mcm[L.set](sec, true)
+                    end
+                    n = n + 1
+                end
+            end
+            counts[L.store] = n
+        end
+        applying = false
+
+        if rax_icon_layers and rax_icon_layers.refresh then
+            pcall(rax_icon_layers.refresh)
+        end
+        dbg("migrated %s favorite(s), %s junk", counts.favorites, counts.junk)
+        return
+    end
+
+    applying = true
+    local added, removed = {}, {}
+    for _, L in ipairs(LISTS) do
+        local a, r = 0, 0
+        if settings_cache[L.setting] then
+            for sec, _ in pairs(sets[L.store]) do
+                if not zzz_rax_sortingplus_mcm[L.is](sec) then
+                    zzz_rax_sortingplus_mcm[L.set](sec, true)
+                    a = a + 1
+                end
+            end
+            if ok and mdata and mdata[L.mdata] then
+                local secs = {}
+                for sec, _ in pairs(mdata[L.mdata]) do secs[#secs + 1] = sec end   -- snapshot
+                for i = 1, #secs do
+                    local sec = secs[i]
+                    if not sets[L.store][sec] and zzz_rax_sortingplus_mcm[L.is](sec) then
+                        zzz_rax_sortingplus_mcm[L.set](sec, false)
+                        r = r + 1
+                    end
+                end
+            end
+        end
+        added[L.store], removed[L.store] = a, r
+    end
+    applying = false
+
+    if rax_icon_layers and rax_icon_layers.refresh then
+        pcall(rax_icon_layers.refresh)
+    end
+
+    dbg("reconciled favorites +%s/-%s, junk +%s/-%s",
+        added.favorites, removed.favorites, added.junk, removed.junk)
+end
+
+local patched = false
+
+local function install_patch()
+    if patched then return end
+    if not sp_available() then return end
+
+    for _, L in ipairs(LISTS) do
+        local store_sec, other_sec, setting = L.store, L.other, L.setting
+        local original = zzz_rax_sortingplus_mcm[L.set]
+        zzz_rax_sortingplus_mcm[L.set] = function(sec, state)
+            original(sec, state)                      -- let SortingPlus update its table first
+            if applying then return end               -- our bulk restore -- don't echo to disk
+            if not settings_cache.enable then return end
+            if not settings_cache[setting] then return end
+            if type(sec) ~= "string" then return end
+            if state then
+                store_mark(store_sec, other_sec, sec)
+            else
+                store_unmark(store_sec, sec)
+            end
+        end
+    end
+
+    patched = true
+    dbg("write-through patches installed")
+end
+
+function reset_store()
+    if sp_available() then
+        applying = true
+        local ok, mdata = pcall(alife_storage_manager.get_state)
+        if ok and mdata then
+            for _, L in ipairs(LISTS) do
+                local live = mdata[L.mdata]
+                if live then
+                    local secs = {}
+                    for sec, _ in pairs(live) do secs[#secs + 1] = sec end   -- snapshot first
+                    for i = 1, #secs do
+                        zzz_rax_sortingplus_mcm[L.set](secs[i], false)
+                    end
+                end
+            end
+        end
+        applying = false
+        if rax_icon_layers and rax_icon_layers.refresh then
+            pcall(rax_icon_layers.refresh)
+        end
+    end
+
+    local path = getFS():update_path("$game_config$", "") .. STORE_FILE
+    local f = io.open(path, "w")
+    if f then f:close() end
+    store = nil
+
+    -- Keep the file initialized-but-empty so the next load stays authoritative (an empty
+    -- authoritative file removes marks a reloaded save carries) instead of re-importing them.
+    mark_initialized()
+
+    dbg("reset - file emptied and live marks cleared")
+    if db.actor then
+        pcall(actor_menu.set_msg, 1, game.translate_string("ui_mcm_persistent_favorites_reset_done"), 4)
+    end
+end
+
+class "reset_confirm_dialog" (CUIScriptWnd)
+
+function reset_confirm_dialog:__init() super()
+    self:SetWndRect(Frect():set(0, 0, 1024, 768))
+    self.mb = CUIMessageBoxEx()
+    self:Register(self.mb, "pf_reset_mb")
+    self:AddCallback("pf_reset_mb", ui_events.MESSAGE_BOX_YES_CLICKED, self.OnYes, self)
+end
+
+function reset_confirm_dialog:OnYes()
+    reset_store()
+end
+
+local reset_dialog  -- lazily-created singleton
+
+function prompt_reset()
+    if not reset_dialog then
+        reset_dialog = reset_confirm_dialog()
+    end
+    reset_dialog.mb:InitMessageBox("message_box_yes_no")
+    reset_dialog.mb:SetText(game.translate_string("ui_mcm_persistent_favorites_reset_confirm"))
+    reset_dialog.mb:ShowDialog(true)
+end
+
+
+-- Callbacks.
+
+function actor_on_first_update_callback()
+    install_patch()
+    sync_and_apply()
+end
+
+function on_option_change_callback()
+    reload_settings_cache()
+end
+
+function on_game_start()
+    reload_settings_cache()
+
+    applying = false
+    store    = nil   -- re-read the file fresh on the next access
+
+    RegisterScriptCallback("actor_on_first_update", actor_on_first_update_callback)
+    RegisterScriptCallback("on_option_change",      on_option_change_callback)
+end

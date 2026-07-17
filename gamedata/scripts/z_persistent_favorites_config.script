@@ -1,0 +1,16 @@
+local function check_row(key, def)
+    return { key = key, def = def, mcm = { type = "check", val = 1 } }
+end
+
+SETTINGS = {
+    check_row("enable",            true),   -- master switch; off = leave SortingPlus untouched
+    check_row("persist_favorites", true),   -- carry the green "favorite" list across games
+    check_row("persist_junk",      true),   -- carry the red "junk" list across games
+    check_row("debug_logging",     false),  -- log every persist/apply to xray_g.log
+}
+
+DEFAULTS = {}
+
+for _, entry in ipairs(SETTINGS) do
+    DEFAULTS[entry.key] = entry.def
+end
