@@ -9,3 +9,5 @@ When enabling the mod, it'll take over Sorting Plus' highlighting of items. The 
 Removing the mod after that just means Sorting Plus goes back to its default behavior and the highlights set in your savegame work again: as if this mod was never enabled.
 
 For GAMMA, the file is located in `<GAMMA folder>\overwrite\gamedata\configs`.
+
+<img width="282" height="57" alt="image" src="https://github.com/user-attachments/assets/0453b46c-4d16-4c95-a3d7-b34ceefea4ed" />
