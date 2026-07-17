@@ -1,0 +1,41 @@
+name: Create Release with Zip Archive
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. 1.0 or 1.0.1 -- no "v" prefix)'
+        required: true
+        default: ''
+      description:
+        description: 'Release description'
+        required: false
+        default: ''
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create zip archive
+        run: |
+          zip -r -9 persistent-favorites-${{ github.event.inputs.version }}.zip gamedata
+          echo "Archive contents:"
+          unzip -l persistent-favorites-${{ github.event.inputs.version }}.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          name: Release ${{ github.event.inputs.version }}
+          body: |
+            ${{ github.event.inputs.description }}
+          files: persistent-favorites-${{ github.event.inputs.version }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
