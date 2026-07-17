@@ -1,0 +1,1 @@
+# stalker-persistent-favorites
