@@ -1,0 +1,17 @@
+# STALKER / AnomalyLuaAutoOptimizer backups
+*.alao-bak
+
+# MO2-local, untracked
+meta.ini
+
+# Compiled Lua / build cruft
+luac.out
+*.o
+*.obj
+*.exe
+*.out
+
+# OS cruft
+Thumbs.db
+desktop.ini
+.DS_Store
